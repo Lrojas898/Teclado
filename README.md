@@ -2,7 +2,7 @@
 
 **Autor**: LUIS MANUEL ROJAS CORREA
 **Código**: A00399289
-**Versión**: 1.0.1
+**Versión**: 1.0.2
 
 ## Descripción
 
