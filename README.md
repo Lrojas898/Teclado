@@ -1,28 +1,25 @@
-# Teclado Virtual - Aplicación Web
+# Teclado Virtual
 
 **Autor**: LUIS MANUEL ROJAS CORREA
 **Código**: A00399289
 
 ## Descripción
 
-Aplicación web de un teclado virtual desarrollada con HTML, CSS y JavaScript vanilla. Esta aplicación forma parte del pipeline DevOps CI/CD y sirve como caso de uso para demostrar la integración completa de herramientas de desarrollo, análisis de calidad y despliegue automatizado.
+Aplicación web de teclado virtual desarrollada con HTML, CSS y JavaScript. Forma parte del pipeline DevOps CI/CD como caso de uso para demostrar integración de herramientas de desarrollo, análisis de calidad y despliegue automatizado.
 
-## Características de la Aplicación
+## Funcionalidades
 
-### Funcionalidades Principales
+- Teclado QWERTY interactivo
+- Campo de entrada de texto
+- Diseño responsive
+- Animaciones CSS
+- Código modular sin dependencias
 
-- **Teclado Virtual Interactivo**: Simulación de un teclado QWERTY completo
-- **Entrada de Texto**: Campo de texto que recibe el input del teclado virtual
-- **Responsive Design**: Adaptable a diferentes tamaños de pantalla
-- **Efectos Visuales**: Animaciones CSS para interacciones de usuario
-- **Clean Code**: Código JavaScript modular y bien estructurado
+## Tecnologías
 
-### Tecnologías Utilizadas
-
-- **HTML5**: Estructura semántica y accesible
-- **CSS3**: Estilos modernos con flexbox y animaciones
-- **JavaScript ES6**: Funcionalidad interactiva sin dependencias externas
-- **Responsive Design**: Media queries para diferentes dispositivos
+- HTML5: Estructura
+- CSS3: Estilos y animaciones
+- JavaScript ES6: Funcionalidad
 
 ## Estructura del Proyecto
 
@@ -59,62 +56,30 @@ Teclado/
 </html>
 ```
 
-### Características CSS (style.css)
-- **Layout Flexbox**: Disposición responsive del teclado
-- **Variables CSS**: Colores y espaciados centralizados
-- **Animations**: Efectos hover y active en las teclas
-- **Media Queries**: Adaptación a tablets y móviles
-- **Typography**: Fuentes legibles y escalables
+### CSS (style.css)
+- Layout flexbox responsive
+- Variables CSS para colores y espaciado
+- Animaciones hover y active
+- Media queries para dispositivos móviles
 
-### Lógica JavaScript (script.js)
-```javascript
-// Generación dinámica del teclado
-const keys = [
-    ['q', 'w', 'e', 'r', 't', 'y', 'u', 'i', 'o', 'p'],
-    ['a', 's', 'd', 'f', 'g', 'h', 'j', 'k', 'l'],
-    ['z', 'x', 'c', 'v', 'b', 'n', 'm']
-];
+### JavaScript (script.js)
+- Generación dinámica del teclado
+- Event listeners para interacciones
+- Manejo de input de texto
+- Efectos visuales
 
-// Event listeners para interacciones
-// Manejo de input de texto
-// Efectos visuales de teclas presionadas
-```
+## Integración Pipeline CI/CD
 
-## Integración con Pipeline CI/CD
+### Build
+Creación dinámica de archivos durante el pipeline:
+- Generación de HTML, CSS y JavaScript
+- Estructura de directorios
 
-### Stage de Build
-La aplicación se construye durante el pipeline mediante la creación dinámica de archivos:
-
-```bash
-# Creación de estructura en Jenkins
-mkdir -p ${WORKSPACE_APP}/css
-cat > index.html << 'EOF'
-# Contenido HTML generado
-EOF
-```
-
-### Stage de Testing
-Validaciones automatizadas implementadas:
-
-```bash
-# Verificación de archivos requeridos
-if [ -f "index.html" ] && [ -f "script.js" ] && [ -f "css/style.css" ]; then
-    echo "✓ Estructura de archivos correcta"
-else
-    echo "✗ Faltan archivos requeridos"
-    exit 1
-fi
-
-# Validación de contenido HTML
-if grep -q "<!DOCTYPE html>" index.html; then
-    echo "✓ HTML válido"
-fi
-
-# Verificación de JavaScript
-if grep -q "function\|const\|let" script.js; then
-    echo "✓ JavaScript presente"
-fi
-```
+### Testing
+Validaciones automatizadas:
+- Verificación de archivos requeridos
+- Validación de sintaxis HTML
+- Verificación de presencia de JavaScript
 
 ### Análisis de Calidad con SonarQube
 
