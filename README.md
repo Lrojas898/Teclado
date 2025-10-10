@@ -70,8 +70,32 @@ Teclado/
 
 ## Integración Pipeline CI/CD
 
+### Trigger Automático
+El pipeline se ejecuta automáticamente mediante webhook configurado:
+- **Repositorio**: https://github.com/Lrojas898/Teclado
+- **Evento**: Push al branch main
+- **Webhook URL**: `http://68.211.125.173:8080/generic-webhook-trigger/invoke`
+- **Token**: `teclado-webhook-token`
+
+Configuración del trigger en Jenkinsfile:
+```groovy
+triggers {
+    GenericTrigger(
+        genericVariables: [
+            [key: 'ref', value: '$.ref'],
+            [key: 'repository_url', value: '$.repository.html_url']
+        ],
+        causeString: 'Triggered by push to Teclado repository',
+        token: 'teclado-webhook-token',
+        regexpFilterText: '$ref,$repository_url',
+        regexpFilterExpression: 'refs/heads/main,https://github.com/Lrojas898/Teclado'
+    )
+}
+```
+
 ### Build
 Creación dinámica de archivos durante el pipeline:
+- Checkout automático del repositorio Teclado
 - Generación de HTML, CSS y JavaScript
 - Estructura de directorios
 
