@@ -71,28 +71,53 @@ Teclado/
 
 ## Integración Pipeline CI/CD
 
-### Trigger Automático
-El pipeline se ejecuta automáticamente mediante webhook configurado:
-- **Repositorio**: https://github.com/Lrojas898/Teclado
-- **Evento**: Push al branch main
-- **Webhook URL**: `http://68.211.125.173:8080/generic-webhook-trigger/invoke`
-- **Token**: `teclado-webhook-token`
+### Arquitectura Multi-Repositorio
+Este proyecto forma parte de una arquitectura DevOps que utiliza 3 repositorios independientes:
 
-Configuración del trigger en Jenkinsfile:
-```groovy
-triggers {
-    GenericTrigger(
-        genericVariables: [
-            [key: 'ref', value: '$.ref'],
-            [key: 'repository_url', value: '$.repository.html_url']
-        ],
-        causeString: 'Triggered by push to Teclado repository',
-        token: 'teclado-webhook-token',
-        regexpFilterText: '$ref,$repository_url',
-        regexpFilterExpression: 'refs/heads/main,https://github.com/Lrojas898/Teclado'
-    )
-}
+1. **Teclado** (este repositorio): Código fuente de la aplicación
+2. **ansible-pipeline**: Configuración del pipeline CI/CD
+3. **terraform_for_each_vm**: Infraestructura como código
+
+### Trigger Automático y Webhook
+El pipeline se ejecuta automáticamente mediante webhook configurado:
+
+- **Repositorio trigger**: https://github.com/Lrojas898/Teclado
+- **Repositorio pipeline**: https://github.com/Lrojas898/ansible-pipeline
+- **Evento**: Push al branch main de este repositorio
+- **Webhook URL**: `http://68.211.125.173/generic-webhook-trigger/invoke?token=teclado-webhook-token`
+- **Jenkins URL**: http://68.211.125.173
+
+### Flujo de Integración
 ```
+[Push a Teclado/main]
+    ↓ (webhook)
+[Jenkins detecta cambio]
+    ↓
+[Lee Jenkinsfile desde ansible-pipeline]
+    ↓
+[Clona código desde Teclado]
+    ↓
+[Ejecuta pipeline: Build → Test → Quality → Deploy]
+```
+
+### Configuración del Webhook
+**Status**: ✅ Configurado y funcionando
+
+**Configuración actual en GitHub**:
+- **Payload URL**: `http://68.211.125.173/generic-webhook-trigger/invoke?token=teclado-webhook-token`
+- **Content type**: `application/json`
+- **Events**: Just the push event
+- **Active**: ✅
+
+### Pipeline Automático
+Cada push a `main` ejecuta automáticamente:
+
+1. **Checkout**: Clona este repositorio
+2. **Build**: Procesa archivos y agrega metadata de build
+3. **Test**: Valida estructura y contenido de archivos
+4. **Quality Analysis**: Análisis de código con SonarQube
+5. **Deploy**: Simulación de despliegue a servidor Nginx
+6. **Health Check**: Verificación post-despliegue
 
 ### Build
 Creación dinámica de archivos durante el pipeline:
