@@ -2,7 +2,6 @@
 
 **Autor**: LUIS MANUEL ROJAS CORREA
 **Código**: A00399289
-**Versión**: 1.0.6
 
 ## Descripción
 
@@ -71,57 +70,8 @@ Teclado/
 
 ## Integración Pipeline CI/CD
 
-### Arquitectura Multi-Repositorio
-Este proyecto forma parte de una arquitectura DevOps que utiliza 3 repositorios independientes:
-
-1. **Teclado** (este repositorio): Código fuente de la aplicación
-2. **ansible-pipeline**: Configuración del pipeline CI/CD
-3. **terraform_for_each_vm**: Infraestructura como código
-
-### Trigger Automático y Webhook
-El pipeline se ejecuta automáticamente mediante webhook configurado:
-
-- **Repositorio trigger**: https://github.com/Lrojas898/Teclado
-- **Repositorio pipeline**: https://github.com/Lrojas898/ansible-pipeline
-- **Evento**: Push al branch main de este repositorio
-- **Webhook URL**: `http://68.211.125.173/generic-webhook-trigger/invoke?token=teclado-webhook-token`
-- **Jenkins URL**: http://68.211.125.173
-
-### Flujo de Integración
-```
-[Push a Teclado/main]
-    ↓ (webhook)
-[Jenkins detecta cambio]
-    ↓
-[Lee Jenkinsfile desde ansible-pipeline]
-    ↓
-[Clona código desde Teclado]
-    ↓
-[Ejecuta pipeline: Build → Test → Quality → Deploy]
-```
-
-### Configuración del Webhook
-**Status**: ✅ Configurado y funcionando
-
-**Configuración actual en GitHub**:
-- **Payload URL**: `http://68.211.125.173/generic-webhook-trigger/invoke?token=teclado-webhook-token`
-- **Content type**: `application/json`
-- **Events**: Just the push event
-- **Active**: ✅
-
-### Pipeline Automático
-Cada push a `main` ejecuta automáticamente:
-
-1. **Checkout**: Clona este repositorio
-2. **Build**: Procesa archivos y agrega metadata de build
-3. **Test**: Valida estructura y contenido de archivos
-4. **Quality Analysis**: Análisis de código con SonarQube
-5. **Deploy**: Simulación de despliegue a servidor Nginx
-6. **Health Check**: Verificación post-despliegue
-
 ### Build
 Creación dinámica de archivos durante el pipeline:
-- Checkout automático del repositorio Teclado
 - Generación de HTML, CSS y JavaScript
 - Estructura de directorios
 
@@ -149,7 +99,45 @@ sonar.sourceEncoding=UTF-8
 - **Vulnerabilidades**: 0
 - **Code Smells**: 0
 - **Duplicación de Código**: 0.0%
-- **Cobertura**: N/A (no aplica para frontend sin tests unitarios)
+- **Cobertura de Código**: 0.0%
+
+### ¿Por qué la Cobertura está en 0%?
+
+La cobertura de código aparece en 0% en SonarQube debido a la configuración actual del proyecto:
+
+**Razones técnicas:**
+1. **No hay pruebas unitarias**: El proyecto utiliza HTML/CSS/JavaScript vanilla sin framework de testing configurado
+2. **SonarQube requiere archivos de cobertura**: Para mostrar cobertura real, necesita archivos como:
+   - `lcov.info` (para JavaScript con Jest/Mocha)
+   - `coverage.xml` (para otros frameworks)
+   - `jacoco.xml` (para proyectos Java)
+
+**Validaciones actuales del pipeline:**
+```bash
+# Stage de Testing actual
+if [ -f "index.html" ] && [ -f "script.js" ] && [ -f "css/style.css" ]; then
+    echo "✓ Estructura de archivos correcta"
+else
+    echo "✗ Faltan archivos requeridos"
+    exit 1
+fi
+```
+
+**Para tener cobertura real se necesitaría:**
+```javascript
+// Ejemplo con Jest
+{
+  "scripts": {
+    "test": "jest --coverage",
+    "test:coverage": "jest --coverage --coverageReporters=lcov"
+  },
+  "devDependencies": {
+    "jest": "^29.0.0"
+  }
+}
+```
+
+**Conclusión**: La cobertura en 0% es normal y esperada para este tipo de aplicación frontend simple sin tests unitarios. SonarQube continúa analizando correctamente la calidad del código en otros aspectos como bugs, vulnerabilidades y code smells.
 
 ## Proceso de Despliegue
 
