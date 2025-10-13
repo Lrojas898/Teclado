@@ -153,7 +153,108 @@ sonar.exclusions=backups/**,sonar-scanner-*/**
 - **Vulnerabilidades**: 0
 - **Code Smells**: 0
 - **Duplicación**: 0.0%
+- **Cobertura**: 0.0%
 - **Líneas analizadas**: ~150
+
+### Por qué la Cobertura está en 0%
+
+La cobertura de código aparece en 0% en SonarQube, lo cual es normal y esperado para este tipo de proyecto. Aquí se explica el porqué:
+
+#### Razones Técnicas
+
+**1. No hay pruebas unitarias implementadas**
+- El proyecto es una aplicación frontend simple con HTML, CSS y JavaScript vanilla
+- No tiene framework de testing configurado (Jest, Mocha, Jasmine, etc.)
+- No existen archivos de test (.test.js, .spec.js)
+
+**2. SonarQube requiere archivos de cobertura**
+Para mostrar cobertura real, SonarQube necesita que se generen archivos de cobertura durante la ejecución de tests:
+- `lcov.info` (para JavaScript con Jest/Mocha)
+- `coverage.xml` (para otros frameworks)
+- `clover.xml` (para PHPUnit, otros)
+
+**3. Tipo de aplicación**
+- Es una aplicación estática frontend sin lógica de negocio compleja
+- La funcionalidad principal es interacción DOM (clicks, eventos)
+- No hay algoritmos complejos que requieran testing unitario extensivo
+
+#### Qué Analiza SonarQube Actualmente
+
+Aunque la cobertura sea 0%, SonarQube sigue analizando:
+
+**Análisis de Calidad Realizado:**
+- **Detección de bugs**: Errores de sintaxis, variables no declaradas
+- **Vulnerabilidades de seguridad**: XSS, injection, eval usage
+- **Code smells**: Código duplicado, funciones muy largas, complejidad
+- **Maintainability**: Estructura del código, naming conventions
+
+**Configuración de Análisis:**
+```properties
+sonar.projectKey=teclado-virtual-pipeline
+sonar.sources=.
+sonar.inclusions=**/*.html,**/*.js,**/*.css
+sonar.exclusions=backups/**,sonar-scanner-*/**
+```
+
+#### Implementar Cobertura (Opcional)
+
+Si se quisiera agregar cobertura de código, se requeriría:
+
+**1. Configurar framework de testing:**
+```json
+{
+  "devDependencies": {
+    "jest": "^29.0.0",
+    "@testing-library/jest-dom": "^6.0.0"
+  },
+  "scripts": {
+    "test": "jest",
+    "test:coverage": "jest --coverage"
+  }
+}
+```
+
+**2. Crear archivos de test:**
+```javascript
+// script.test.js
+describe('Teclado Virtual', () => {
+  test('should create keyboard layout', () => {
+    // Test implementation
+  });
+
+  test('should handle key press', () => {
+    // Test implementation
+  });
+});
+```
+
+**3. Configurar Jest para generar cobertura:**
+```javascript
+// jest.config.js
+module.exports = {
+  collectCoverage: true,
+  coverageDirectory: 'coverage',
+  coverageReporters: ['lcov', 'text', 'html']
+};
+```
+
+**4. Actualizar pipeline SonarQube:**
+```bash
+# En el pipeline Jenkins
+npm test -- --coverage
+sonar-scanner -Dsonar.javascript.lcov.reportPaths=coverage/lcov.info
+```
+
+#### Conclusión
+
+La cobertura en 0% es **normal y aceptable** para este proyecto porque:
+
+1. **Es una aplicación frontend simple** sin lógica de negocio compleja
+2. **SonarQube cumple su función principal** analizando bugs, vulnerabilidades y code smells
+3. **Quality Gate pasa exitosamente** indicando código de calidad
+4. **El proyecto no requiere testing unitario extensivo** para su propósito actual
+
+La ausencia de cobertura no indica problemas de calidad del código, simplemente refleja que no se implementaron pruebas unitarias, lo cual es una decisión válida para aplicaciones de este tipo y complejidad.
 
 ### Acceso a Análisis
 
