@@ -12,7 +12,7 @@ Aplicación web de teclado virtual desarrollada con HTML, CSS y JavaScript. Form
 - Teclado QWERTY interactivo
 - Campo de entrada de texto
 - Diseño responsive
-- Animaciones CSS
+- Animaciones en CSS
 - Código modular sin dependencias
 
 ## Tecnologías
