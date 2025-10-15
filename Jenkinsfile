@@ -1,11 +1,6 @@
 pipeline {
     agent any
-
-    triggers {
-        // Trigger mediante GitHub webhook - push a main dispara pipeline automáticamente
-        // pollSCM('H/2 * * * *') // Deshabilitado - reemplazado por webhook
-    }
-
+    
     options {
         buildDiscarder(logRotator(numToKeepStr: '10', daysToKeepStr: '30'))
         timeout(time: 15, unit: 'MINUTES')
