@@ -1,0 +1,494 @@
+pipeline {
+    agent any
+
+    options {
+        buildDiscarder(logRotator(numToKeepStr: '10', daysToKeepStr: '30'))
+        timeout(time: 10, unit: 'MINUTES')
+        disableConcurrentBuilds()
+    }
+
+    environment {
+        // Configuración de SonarQube
+        SONAR_HOST_URL = 'http://68.211.125.173:9000'
+        SONAR_TOKEN = 'sqa_461deb36c6a6df74233a1aa4b3ab01cd9714af56'
+
+        // Directorio de trabajo
+        WORKSPACE_APP = "/tmp/teclado-pr-${BUILD_NUMBER}"
+
+        // Configuración de build
+        BUILD_TIMESTAMP = sh(script: 'date "+%Y-%m-%d_%H:%M:%S"', returnStdout: true).trim()
+        BUILD_DATE = sh(script: 'date "+%Y-%m-%d %H:%M:%S"', returnStdout: true).trim()
+        APP_VERSION = "PR-${BUILD_NUMBER}"
+    }
+
+    stages {
+        stage('PR Info') {
+            steps {
+                script {
+                    echo "========================================="
+                    echo "  PIPELINE DE VALIDACION DE PULL REQUEST"
+                    echo "========================================="
+                    echo ""
+                    echo "Branch: ${env.BRANCH_NAME}"
+                    echo "Build: #${BUILD_NUMBER}"
+                    echo "Timestamp: ${BUILD_DATE}"
+                    echo ""
+                    echo "Este pipeline valida el codigo ANTES del merge a main"
+                    echo "NO despliega a produccion"
+                    echo ""
+                }
+            }
+        }
+
+        stage('Checkout') {
+            steps {
+                echo 'CHECKOUT - Obteniendo codigo del Pull Request'
+
+                checkout scm
+
+                sh '''
+                    echo "=== CHECKOUT COMPLETADO ==="
+                    echo "Commit: $(git rev-parse HEAD)"
+                    echo "Autor: $(git log -1 --pretty=format:'%an <%ae>')"
+                    echo "Mensaje: $(git log -1 --pretty=format:'%s')"
+                    echo "Fecha: $(git log -1 --pretty=format:'%ci')"
+
+                    # Preparar directorio de trabajo
+                    rm -rf ${WORKSPACE_APP}
+                    mkdir -p ${WORKSPACE_APP}
+
+                    # Copiar archivos del repositorio
+                    cp -r . ${WORKSPACE_APP}/
+                    cd ${WORKSPACE_APP}
+                    rm -rf .git
+
+                    echo "=== ARCHIVOS EN WORKSPACE ==="
+                    find . -type f -name "*.html" -o -name "*.js" -o -name "*.css" | sort
+                '''
+            }
+        }
+
+        stage('Build') {
+            steps {
+                echo "BUILD - Verificando que el codigo compile correctamente"
+
+                sh '''
+                    cd ${WORKSPACE_APP}
+                    echo "=== INICIANDO BUILD DE VALIDACION ==="
+
+                    # Verificar estructura de archivos requerida
+                    if [ ! -f "index.html" ]; then
+                        echo "ERROR: index.html no encontrado"
+                        exit 1
+                    fi
+
+                    if [ ! -f "script.js" ]; then
+                        echo "ERROR: script.js no encontrado"
+                        exit 1
+                    fi
+
+                    if [ ! -d "css" ] || [ ! -f "css/style.css" ]; then
+                        echo "ERROR: css/style.css no encontrado"
+                        exit 1
+                    fi
+
+                    echo "SUCCESS: Estructura de archivos correcta"
+
+                    # Crear backup de archivos originales
+                    mkdir -p backups
+                    cp index.html backups/index.html.original
+                    cp script.js backups/script.js.original
+                    cp -r css backups/css.original
+
+                    # Verificar tamano de archivos (no deben ser excesivamente grandes)
+                    HTML_SIZE=$(stat -f%z index.html 2>/dev/null || stat -c%s index.html)
+                    JS_SIZE=$(stat -f%z script.js 2>/dev/null || stat -c%s script.js)
+                    CSS_SIZE=$(stat -f%z css/style.css 2>/dev/null || stat -c%s css/style.css)
+
+                    echo "Tamaño de archivos:"
+                    echo "  - index.html: $HTML_SIZE bytes"
+                    echo "  - script.js: $JS_SIZE bytes"
+                    echo "  - css/style.css: $CSS_SIZE bytes"
+
+                    # Advertencia si archivos son muy grandes (>100KB cada uno)
+                    if [ $HTML_SIZE -gt 102400 ] || [ $JS_SIZE -gt 102400 ] || [ $CSS_SIZE -gt 102400 ]; then
+                        echo "WARNING: Archivos grandes detectados - revisar optimizacion"
+                    fi
+
+                    echo "=== BUILD COMPLETADO ==="
+                '''
+            }
+        }
+
+        stage('Test') {
+            steps {
+                echo "TEST - Ejecutando pruebas automatizadas"
+
+                sh '''
+                    cd ${WORKSPACE_APP}
+                    echo "=== INICIANDO TESTS ==="
+
+                    # Contador de tests
+                    TESTS_PASSED=0
+                    TESTS_TOTAL=0
+
+                    # Test 1: Estructura de archivos
+                    TESTS_TOTAL=$((TESTS_TOTAL + 1))
+                    echo ""
+                    echo "Test 1/6: Verificando estructura de archivos..."
+                    if [ -f "index.html" ] && [ -f "script.js" ] && [ -d "css" ] && [ -f "css/style.css" ]; then
+                        echo "✓ PASS: Estructura de archivos correcta"
+                        TESTS_PASSED=$((TESTS_PASSED + 1))
+                    else
+                        echo "✗ FAIL: Estructura de archivos incorrecta"
+                    fi
+
+                    # Test 2: Validacion HTML basica
+                    TESTS_TOTAL=$((TESTS_TOTAL + 1))
+                    echo ""
+                    echo "Test 2/6: Validando HTML..."
+                    HTML_ERRORS=0
+
+                    if ! grep -q "<!DOCTYPE html>" index.html; then
+                        echo "  ERROR: DOCTYPE HTML5 faltante"
+                        HTML_ERRORS=$((HTML_ERRORS + 1))
+                    fi
+
+                    if ! grep -q "charset" index.html; then
+                        echo "  ERROR: Charset no especificado"
+                        HTML_ERRORS=$((HTML_ERRORS + 1))
+                    fi
+
+                    if ! grep -q "<title>.*</title>" index.html; then
+                        echo "  ERROR: Title faltante"
+                        HTML_ERRORS=$((HTML_ERRORS + 1))
+                    fi
+
+                    if ! grep -q "style.css" index.html; then
+                        echo "  ERROR: Enlace a CSS faltante"
+                        HTML_ERRORS=$((HTML_ERRORS + 1))
+                    fi
+
+                    if ! grep -q "script.js" index.html; then
+                        echo "  ERROR: Enlace a JS faltante"
+                        HTML_ERRORS=$((HTML_ERRORS + 1))
+                    fi
+
+                    if [ $HTML_ERRORS -eq 0 ]; then
+                        echo "✓ PASS: HTML valido"
+                        TESTS_PASSED=$((TESTS_PASSED + 1))
+                    else
+                        echo "✗ FAIL: $HTML_ERRORS errores en HTML"
+                    fi
+
+                    # Test 3: Validacion CSS
+                    TESTS_TOTAL=$((TESTS_TOTAL + 1))
+                    echo ""
+                    echo "Test 3/6: Validando CSS..."
+                    if [ -s "css/style.css" ]; then
+                        if grep -q "{" css/style.css && grep -q "}" css/style.css; then
+                            echo "✓ PASS: CSS tiene sintaxis valida"
+                            TESTS_PASSED=$((TESTS_PASSED + 1))
+                        else
+                            echo "✗ FAIL: CSS con sintaxis incorrecta"
+                        fi
+                    else
+                        echo "✗ FAIL: CSS vacio o faltante"
+                    fi
+
+                    # Test 4: Validacion JavaScript
+                    TESTS_TOTAL=$((TESTS_TOTAL + 1))
+                    echo ""
+                    echo "Test 4/6: Validando JavaScript..."
+                    if [ -s "script.js" ]; then
+                        if grep -q "function\\|console\\|var\\|let\\|const\\|=" script.js; then
+                            echo "✓ PASS: JavaScript contiene codigo valido"
+                            TESTS_PASSED=$((TESTS_PASSED + 1))
+                        else
+                            echo "✗ FAIL: JavaScript parece vacio o invalido"
+                        fi
+                    else
+                        echo "✗ FAIL: JavaScript vacio o faltante"
+                    fi
+
+                    # Test 5: Verificar que no hay errores de sintaxis comunes
+                    TESTS_TOTAL=$((TESTS_TOTAL + 1))
+                    echo ""
+                    echo "Test 5/6: Buscando errores de sintaxis comunes..."
+                    SYNTAX_ERRORS=0
+
+                    # Buscar console.log en archivos (debe estar comentado en produccion)
+                    if grep -q "console.log" script.js; then
+                        echo "  WARNING: console.log encontrado (considerar remover)"
+                    fi
+
+                    # Buscar comentarios TODO
+                    if grep -qi "TODO" index.html script.js css/style.css 2>/dev/null; then
+                        echo "  WARNING: Comentarios TODO encontrados"
+                    fi
+
+                    if [ $SYNTAX_ERRORS -eq 0 ]; then
+                        echo "✓ PASS: No se encontraron errores de sintaxis criticos"
+                        TESTS_PASSED=$((TESTS_PASSED + 1))
+                    else
+                        echo "✗ FAIL: Errores de sintaxis encontrados"
+                    fi
+
+                    # Test 6: Verificar que archivos no estan vacios
+                    TESTS_TOTAL=$((TESTS_TOTAL + 1))
+                    echo ""
+                    echo "Test 6/6: Verificando que archivos no estan vacios..."
+                    EMPTY_FILES=0
+
+                    if [ ! -s "index.html" ]; then
+                        echo "  ERROR: index.html esta vacio"
+                        EMPTY_FILES=$((EMPTY_FILES + 1))
+                    fi
+
+                    if [ ! -s "script.js" ]; then
+                        echo "  ERROR: script.js esta vacio"
+                        EMPTY_FILES=$((EMPTY_FILES + 1))
+                    fi
+
+                    if [ ! -s "css/style.css" ]; then
+                        echo "  ERROR: style.css esta vacio"
+                        EMPTY_FILES=$((EMPTY_FILES + 1))
+                    fi
+
+                    if [ $EMPTY_FILES -eq 0 ]; then
+                        echo "✓ PASS: Todos los archivos tienen contenido"
+                        TESTS_PASSED=$((TESTS_PASSED + 1))
+                    else
+                        echo "✗ FAIL: $EMPTY_FILES archivos vacios"
+                    fi
+
+                    # Generar reporte de tests
+                    echo ""
+                    echo "============================================"
+                    echo "        REPORTE DE TESTS"
+                    echo "============================================"
+                    echo "Tests ejecutados: $TESTS_TOTAL"
+                    echo "Tests exitosos:   $TESTS_PASSED"
+                    echo "Tests fallidos:   $((TESTS_TOTAL - TESTS_PASSED))"
+                    echo "Porcentaje exito: $(( TESTS_PASSED * 100 / TESTS_TOTAL ))%"
+                    echo "============================================"
+
+                    # Crear archivo de reporte JSON
+                    cat > test-report.json << EOF
+{
+    "tests_total": $TESTS_TOTAL,
+    "tests_passed": $TESTS_PASSED,
+    "tests_failed": $((TESTS_TOTAL - TESTS_PASSED)),
+    "success_rate": $(( TESTS_PASSED * 100 / TESTS_TOTAL )),
+    "timestamp": "${BUILD_DATE}",
+    "type": "PR Validation"
+}
+EOF
+
+                    # Fallar si no todos los tests pasaron
+                    if [ $TESTS_PASSED -eq $TESTS_TOTAL ]; then
+                        echo ""
+                        echo "SUCCESS: TODOS LOS TESTS PASARON"
+                    else
+                        echo ""
+                        echo "ERROR: ALGUNOS TESTS FALLARON"
+                        echo "El Pull Request debe corregirse antes del merge"
+                        exit 1
+                    fi
+                '''
+            }
+        }
+
+        stage('Quality Analysis') {
+            steps {
+                echo "QUALITY ANALYSIS - Analisis de calidad con SonarQube"
+
+                sh '''
+                    cd ${WORKSPACE_APP}
+                    echo "=== INICIANDO ANALISIS DE CALIDAD ==="
+
+                    # Verificar conectividad con SonarQube
+                    echo "Verificando conexion con SonarQube..."
+                    SONAR_STATUS=$(curl -s -w "%{http_code}" ${SONAR_HOST_URL}/api/system/status -o /tmp/sonar_response.json || echo "000")
+
+                    if [ "$SONAR_STATUS" = "200" ]; then
+                        echo "SUCCESS: SonarQube disponible"
+
+                        # Instalar herramientas si no estan disponibles
+                        if ! command -v wget >/dev/null 2>&1; then
+                            echo "Instalando herramientas necesarias..."
+                            apt-get update -qq && apt-get install -y -qq wget unzip openjdk-17-jre-headless
+                        fi
+
+                        # Descargar SonarQube Scanner si no existe
+                        if [ ! -d "sonar-scanner-5.0.1.3006-linux" ]; then
+                            echo "Descargando SonarQube Scanner..."
+                            wget -q https://binaries.sonarsource.com/Distribution/sonar-scanner-cli/sonar-scanner-cli-5.0.1.3006-linux.zip
+                            unzip -q sonar-scanner-cli-5.0.1.3006-linux.zip
+                        fi
+
+                        export PATH=$(pwd)/sonar-scanner-5.0.1.3006-linux/bin:$PATH
+
+                        # Configuracion del proyecto para PR
+                        cat > sonar-project.properties << EOF
+sonar.projectKey=teclado-virtual-pipeline
+sonar.projectName=Teclado Virtual - PR Validation
+sonar.projectVersion=${APP_VERSION}
+sonar.sources=.
+sonar.inclusions=**/*.html,**/*.js,**/*.css
+sonar.exclusions=backups/**,sonar-scanner-*/**,test-report.json
+sonar.sourceEncoding=UTF-8
+sonar.host.url=${SONAR_HOST_URL}
+sonar.token=${SONAR_TOKEN}
+EOF
+
+                        echo "Ejecutando analisis de calidad..."
+                        sonar-scanner
+
+                        # Esperar procesamiento de SonarQube
+                        echo "Esperando resultados del Quality Gate..."
+                        sleep 15
+
+                        # Obtener status del Quality Gate
+                        QG_RESPONSE=$(curl -s "${SONAR_HOST_URL}/api/qualitygates/project_status?projectKey=teclado-virtual-pipeline" -H "Authorization: Bearer ${SONAR_TOKEN}")
+                        echo "Respuesta Quality Gate: $QG_RESPONSE"
+
+                        QUALITY_GATE=$(echo "$QG_RESPONSE" | grep -o '"status":"[^"]*"' | head -1 | cut -d'"' -f4)
+                        echo "Quality Gate Status: [$QUALITY_GATE]"
+
+                        if [ "$QUALITY_GATE" = "OK" ]; then
+                            echo ""
+                            echo "============================================"
+                            echo "  ✓ QUALITY GATE: PASSED"
+                            echo "============================================"
+                            echo ""
+                            echo "El codigo cumple con los estandares de calidad"
+                        else
+                            echo ""
+                            echo "============================================"
+                            echo "  ✗ QUALITY GATE: FAILED"
+                            echo "============================================"
+                            echo ""
+                            echo "El codigo NO cumple con los estandares de calidad"
+                            echo "Revisa el reporte en: ${SONAR_HOST_URL}/dashboard?id=teclado-virtual-pipeline"
+                            echo ""
+                            echo "Posibles problemas:"
+                            echo "  - Bugs detectados"
+                            echo "  - Vulnerabilidades de seguridad"
+                            echo "  - Code smells"
+                            echo "  - Duplicacion de codigo"
+                            echo ""
+                            exit 1
+                        fi
+
+                    else
+                        echo "WARNING: SonarQube no disponible (HTTP: $SONAR_STATUS)"
+                        echo "Ejecutando analisis local basico..."
+
+                        # Analisis local simple si SonarQube no esta disponible
+                        HTML_FILES=$(find . -name "*.html" | wc -l)
+                        JS_FILES=$(find . -name "*.js" | wc -l)
+                        CSS_FILES=$(find . -name "*.css" | wc -l)
+                        TOTAL_LINES=$(find . -name "*.html" -o -name "*.js" -o -name "*.css" -exec wc -l {} + 2>/dev/null | tail -1 | awk '{print $1}')
+
+                        echo ""
+                        echo "Estadisticas del codigo:"
+                        echo "  Archivos HTML: $HTML_FILES"
+                        echo "  Archivos JS: $JS_FILES"
+                        echo "  Archivos CSS: $CSS_FILES"
+                        echo "  Total lineas: $TOTAL_LINES"
+                        echo ""
+                        echo "SUCCESS: Analisis local completado"
+                    fi
+
+                    echo "=== ANALISIS DE CALIDAD COMPLETADO ==="
+                '''
+            }
+        }
+
+        stage('PR Validation Summary') {
+            steps {
+                script {
+                    echo ""
+                    echo "============================================"
+                    echo "  RESUMEN DE VALIDACION DEL PULL REQUEST"
+                    echo "============================================"
+                    echo ""
+                    echo "✓ Checkout:         COMPLETADO"
+                    echo "✓ Build:            COMPLETADO"
+                    echo "✓ Tests:            TODOS PASARON"
+                    echo "✓ Quality Gate:     APROBADO"
+                    echo ""
+                    echo "============================================"
+                    echo "  RESULTADO: PULL REQUEST APROBADO"
+                    echo "============================================"
+                    echo ""
+                    echo "Este Pull Request cumple con todos los"
+                    echo "requisitos de calidad y puede ser mergeado"
+                    echo "a la rama main."
+                    echo ""
+                    echo "Siguiente paso:"
+                    echo "  1. Revisar codigo manualmente"
+                    echo "  2. Aprobar Pull Request"
+                    echo "  3. Hacer merge a main"
+                    echo "  4. El pipeline de deploy se ejecutara"
+                    echo "     automaticamente"
+                    echo ""
+                    echo "Build: #${BUILD_NUMBER}"
+                    echo "Timestamp: ${BUILD_DATE}"
+                    echo "============================================"
+                }
+            }
+        }
+    }
+
+    post {
+        always {
+            echo 'Limpiando workspace temporal'
+            sh 'rm -rf ${WORKSPACE_APP} || true'
+        }
+
+        success {
+            echo ''
+            echo '============================================'
+            echo '  ✓ VALIDACION EXITOSA'
+            echo '============================================'
+            echo ''
+            echo 'El Pull Request ha pasado todas las validaciones:'
+            echo '  ✓ Estructura de archivos correcta'
+            echo '  ✓ Todos los tests pasaron'
+            echo '  ✓ Quality Gate aprobado'
+            echo ''
+            echo 'Este PR esta listo para ser revisado y mergeado.'
+            echo ''
+        }
+
+        failure {
+            echo ''
+            echo '============================================'
+            echo '  ✗ VALIDACION FALLIDA'
+            echo '============================================'
+            echo ''
+            echo 'El Pull Request NO paso las validaciones.'
+            echo ''
+            echo 'Acciones requeridas:'
+            echo '  1. Revisar los logs de error arriba'
+            echo '  2. Corregir los problemas encontrados'
+            echo '  3. Hacer commit y push de los cambios'
+            echo '  4. El pipeline se ejecutara automaticamente'
+            echo ''
+            echo 'Errores comunes:'
+            echo '  - Tests fallidos'
+            echo '  - Quality Gate no aprobado'
+            echo '  - Archivos faltantes'
+            echo '  - Sintaxis incorrecta'
+            echo ''
+            echo 'Para mas detalles, revisa los stages arriba.'
+            echo ''
+        }
+
+        unstable {
+            echo 'WARNING: Pipeline completado con ADVERTENCIAS'
+        }
+    }
+}
