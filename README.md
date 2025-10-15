@@ -2,6 +2,8 @@
 
 **Autor**: LUIS MANUEL ROJAS CORREA
 **Código**: A00399289
+**Colab**: RAFAELA SOFIA RUIZ PIZARRO
+**Código**: A00395368
 
 ## Descripción
 
@@ -22,6 +24,8 @@ Aplicación web interactiva de teclado virtual desarrollada con HTML5, CSS3 y Ja
 - **HTML5**: Estructura semántica y responsive
 - **CSS3**: Estilos modernos con flexbox y animaciones
 - **JavaScript ES6**: Funcionalidad interactiva sin dependencias externas
+
+![alt text](image1.png)
 
 ## Estructura del Proyecto
 
@@ -69,6 +73,33 @@ La aplicación se integra automáticamente con un pipeline Jenkins que:
 4. **Analiza calidad** con SonarQube
 5. **Despliega automáticamente** al servidor de producción
 
+### Pipelines (Jenkinsfiles y Webhooks)
+
+Este proyecto utiliza Jenkinsfiles declarativos y Webhooks de GitHub para automatizar el flujo de CI/CD. Se configuraron pipelines en dos repositorios relacionados:
+
+- `Teclado` (aplicación frontend): contiene un `Jenkinsfile` con pasos de build, inyección de metadata, minificación y empaquetado.
+- `ansible-pipeline` (orquestación): contiene un `Jenkinsfile` que orquesta análisis de calidad (SonarQube), ejecución de playbooks Ansible y despliegue en Nginx.
+
+Flujo cuando se hace push a `main`:
+
+1. Se hace push al branch `main` en GitHub.
+2. GitHub envía un Webhook a Jenkins (si está configurado). Alternativamente, Jenkins puede usar `Poll SCM`.
+3. Jenkins detecta el commit y lanza el Job/Multibranch Pipeline correspondiente.
+4. Jenkins descarga el `Jenkinsfile` (Script Path: `Jenkinsfile`) y ejecuta las etapas: checkout → build → test → quality analysis → deploy → health check.
+
+Qué verificar en Jenkins tras un push:
+
+- Build History: confirmar que aparece una ejecución nueva para el commit.
+- Console Output: revisar logs completos del build para ver errores o pasos faltantes.
+- Stage View: ver el progreso y tiempos por etapa (útil para diagnosticar etapas lentas como SonarQube).
+- Workspace / Artifacts: comprobar generación de `build-manifest.json`, empaquetados y artefactos.
+
+Notas operativas:
+
+- Aunque el webhook dispara builds inmediatamente, el Job puede estar configurado con `Poll SCM` (`H/2 * * * *`) para revisiones periódicas cada 2 minutos.
+- Para depurar fallos reproducibles, usar "Build Now" en Jenkins y luego "Replay" o revisar el `Jenkinsfile` usado por ese build.
+- Es buena práctica conservar capturas del Stage View (por ejemplo `img/jenkins-stages.png`) en el repositorio para evidencias visuales del pipeline.
+
 ### Trigger del Pipeline
 
 ```yaml
@@ -83,30 +114,33 @@ Pipeline: https://github.com/Lrojas898/ansible-pipeline.git
 Durante el pipeline, la aplicación recibe:
 
 1. **Inyección de información de build**:
+
 ```html
 <div class="build-info">
-    <h3>BUILD INFORMATION</h3>
-    <p><strong>Version:</strong> v1.0.26</p>
-    <p><strong>Build:</strong> #26</p>
-    <p><strong>Timestamp:</strong> 2025-10-13 12:30:31</p>
-    <p><strong>Pipeline:</strong> Jenkins + SonarQube + Deploy</p>
+  <h3>BUILD INFORMATION</h3>
+  <p><strong>Version:</strong> v1.0.26</p>
+  <p><strong>Build:</strong> #26</p>
+  <p><strong>Timestamp:</strong> 2025-10-13 12:30:31</p>
+  <p><strong>Pipeline:</strong> Jenkins + SonarQube + Deploy</p>
 </div>
 ```
 
 2. **Metadata del build**:
+
 ```javascript
-console.log('App built at: 2025-10-13 12:30:31');
-console.log('Version: v1.0.26');
+console.log("App built at: 2025-10-13 12:30:31");
+console.log("Version: v1.0.26");
 ```
 
 3. **Manifiesto del build**:
+
 ```json
 {
-    "version": "v1.0.26",
-    "build_number": "26",
-    "build_timestamp": "2025-10-13_12:30:31",
-    "pipeline": "jenkins",
-    "environment": "production"
+  "version": "v1.0.26",
+  "build_number": "26",
+  "build_timestamp": "2025-10-13_12:30:31",
+  "pipeline": "jenkins",
+  "environment": "production"
 }
 ```
 
@@ -116,13 +150,13 @@ console.log('Version: v1.0.26');
 
 El pipeline ejecuta 5 tests automáticos:
 
-| Test | Validación | Criterio |
-|------|------------|----------|
-| 1 | Estructura de archivos | Existencia de index.html, script.js, css/style.css |
-| 2 | HTML | DOCTYPE, charset, title, enlaces CSS/JS |
-| 3 | CSS | Sintaxis básica con llaves válidas |
-| 4 | JavaScript | Presencia de código funcional |
-| 5 | Build Info | Metadata inyectada correctamente |
+| Test | Validación             | Criterio                                           |
+| ---- | ---------------------- | -------------------------------------------------- |
+| 1    | Estructura de archivos | Existencia de index.html, script.js, css/style.css |
+| 2    | HTML                   | DOCTYPE, charset, title, enlaces CSS/JS            |
+| 3    | CSS                    | Sintaxis básica con llaves válidas                 |
+| 4    | JavaScript             | Presencia de código funcional                      |
+| 5    | Build Info             | Metadata inyectada correctamente                   |
 
 ### Criterio de Fallo
 
@@ -156,6 +190,15 @@ sonar.exclusions=backups/**,sonar-scanner-*/**
 - **Cobertura**: 0.0%
 - **Líneas analizadas**: ~150
 
+![SonarQube Overview - Teclado](image.png)
+
+La captura del dashboard de SonarQube demuestra que el Quality Gate pasó en las últimas ejecuciones del pipeline. En ella se aprecia:
+
+- Quality Gate: PASSED — evidencia de que las reglas configuradas (bugs, vulnerabilidades, code smells) se cumplen.
+- Métricas limpias en fiabilidad y seguridad (0 bugs, 0 vulnerabilidades).
+
+Nota: la cobertura aparece en 0% porque el proyecto no genera informes de cobertura (no se ejecutan tests unitarios que generen `lcov.info`), pero el análisis está ejecutándose correctamente para las métricas estáticas.
+
 ### Por qué la Cobertura está en 0%
 
 La cobertura de código aparece en 0% en SonarQube, lo cual es normal y esperado para este tipo de proyecto. Aquí se explica el porqué:
@@ -163,17 +206,20 @@ La cobertura de código aparece en 0% en SonarQube, lo cual es normal y esperado
 #### Razones Técnicas
 
 **1. No hay pruebas unitarias implementadas**
+
 - El proyecto es una aplicación frontend simple con HTML, CSS y JavaScript vanilla
 - No tiene framework de testing configurado (Jest, Mocha, Jasmine, etc.)
 - No existen archivos de test (.test.js, .spec.js)
 
 **2. SonarQube requiere archivos de cobertura**
 Para mostrar cobertura real, SonarQube necesita que se generen archivos de cobertura durante la ejecución de tests:
+
 - `lcov.info` (para JavaScript con Jest/Mocha)
 - `coverage.xml` (para otros frameworks)
 - `clover.xml` (para PHPUnit, otros)
 
 **3. Tipo de aplicación**
+
 - Es una aplicación estática frontend sin lógica de negocio compleja
 - La funcionalidad principal es interacción DOM (clicks, eventos)
 - No hay algoritmos complejos que requieran testing unitario extensivo
@@ -183,12 +229,14 @@ Para mostrar cobertura real, SonarQube necesita que se generen archivos de cober
 Aunque la cobertura sea 0%, SonarQube sigue analizando:
 
 **Análisis de Calidad Realizado:**
+
 - **Detección de bugs**: Errores de sintaxis, variables no declaradas
 - **Vulnerabilidades de seguridad**: XSS, injection, eval usage
 - **Code smells**: Código duplicado, funciones muy largas, complejidad
 - **Maintainability**: Estructura del código, naming conventions
 
 **Configuración de Análisis:**
+
 ```properties
 sonar.projectKey=teclado-virtual-pipeline
 sonar.sources=.
@@ -201,6 +249,7 @@ sonar.exclusions=backups/**,sonar-scanner-*/**
 Si se quisiera agregar cobertura de código, se requeriría:
 
 **1. Configurar framework de testing:**
+
 ```json
 {
   "devDependencies": {
@@ -215,30 +264,33 @@ Si se quisiera agregar cobertura de código, se requeriría:
 ```
 
 **2. Crear archivos de test:**
+
 ```javascript
 // script.test.js
-describe('Teclado Virtual', () => {
-  test('should create keyboard layout', () => {
+describe("Teclado Virtual", () => {
+  test("should create keyboard layout", () => {
     // Test implementation
   });
 
-  test('should handle key press', () => {
+  test("should handle key press", () => {
     // Test implementation
   });
 });
 ```
 
 **3. Configurar Jest para generar cobertura:**
+
 ```javascript
 // jest.config.js
 module.exports = {
   collectCoverage: true,
-  coverageDirectory: 'coverage',
-  coverageReporters: ['lcov', 'text', 'html']
+  coverageDirectory: "coverage",
+  coverageReporters: ["lcov", "text", "html"],
 };
 ```
 
 **4. Actualizar pipeline SonarQube:**
+
 ```bash
 # En el pipeline Jenkins
 npm test -- --coverage
@@ -338,19 +390,19 @@ python3 -m http.server 8000
 ```html
 <!DOCTYPE html>
 <html lang="es">
-<head>
-    <meta charset="UTF-8">
+  <head>
+    <meta charset="UTF-8" />
     <title>Teclado Virtual</title>
-    <link rel="stylesheet" href="css/style.css">
-</head>
-<body>
+    <link rel="stylesheet" href="css/style.css" />
+  </head>
+  <body>
     <h1>TECLADO VIRTUAL - PIPELINE CI/CD</h1>
     <div class="container">
-        <input type="text" id="textInput" placeholder="Escribe aquí...">
-        <div class="keyboard" id="keyboard"></div>
+      <input type="text" id="textInput" placeholder="Escribe aquí..." />
+      <div class="keyboard" id="keyboard"></div>
     </div>
     <script src="script.js"></script>
-</body>
+  </body>
 </html>
 ```
 
@@ -361,17 +413,17 @@ python3 -m http.server 8000
 ```css
 /* Media queries implementadas */
 @media (max-width: 768px) {
-    .key {
-        min-width: 30px;
-        height: 35px;
-        font-size: 14px;
-    }
+  .key {
+    min-width: 30px;
+    height: 35px;
+    font-size: 14px;
+  }
 }
 
 @media (max-width: 480px) {
-    .keyboard {
-        padding: 10px;
-    }
+  .keyboard {
+    padding: 10px;
+  }
 }
 ```
 
@@ -416,8 +468,10 @@ main branch:
 ### Problemas Comunes
 
 #### 1. Aplicación no actualiza en producción
+
 **Causa**: Pipeline falló o nginx no recargado
 **Solución**:
+
 ```bash
 # Verificar estado del pipeline
 curl http://68.211.125.173
@@ -427,8 +481,10 @@ ssh adminuser@68.211.125.160 "systemctl status nginx"
 ```
 
 #### 2. Estilos no cargan correctamente
+
 **Causa**: Ruta CSS incorrecta o archivo no desplegado
 **Solución**:
+
 ```bash
 # Verificar archivo CSS
 curl -I http://68.211.125.160/css/style.css
@@ -438,8 +494,10 @@ ssh adminuser@68.211.125.160 "sudo tail /var/log/nginx/error.log"
 ```
 
 #### 3. JavaScript no funciona
+
 **Causa**: Error de sintaxis o archivo no encontrado
 **Solución**:
+
 - Revisar consola del navegador (F12)
 - Verificar análisis SonarQube para errores
 
@@ -459,6 +517,10 @@ ssh adminuser@68.211.125.160 "sudo tail /var/log/nginx/error.log"
 - **Deploy Frequency**: Por cada push a main
 - **Mean Time to Recovery**: <2 minutos
 
+![Jenkins Stage View - Teclado Pipeline](imagenJenkTec.png)
+
+Stage View (Jenkins): la captura muestra ejecuciones recientes del pipeline y los tiempos por etapa. Cada columna representa una etapa en el `Jenkinsfile` (Checkout, Build, Test, Quality Analysis, Deploy, Health Check, Post Actions). Las celdas verdes indican etapas exitosas; los tiempos en la cabecera ayudan a identificar cuellos de botella (por ejemplo, el análisis de SonarQube suele ser el más largo). Esta evidencia confirma que los pushes a `main` disparan ejecuciones y que el proceso de build→análisis→deploy se completó correctamente en las ejecuciones mostradas.
+
 ## Evolución y Roadmap
 
 ### Mejoras Implementadas
@@ -477,4 +539,5 @@ ssh adminuser@68.211.125.160 "sudo tail /var/log/nginx/error.log"
 5. **Monitoring**: Métricas de uso y performance
 
 Esta aplicación demuestra la implementación exitosa de una aplicación web moderna integrada con un pipeline CI/CD completo, siguiendo las mejores prácticas de desarrollo, calidad y operaciones.
+
 <!-- Webhook test: Generic Webhook Trigger configured -->
