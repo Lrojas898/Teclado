@@ -21,9 +21,9 @@ pipeline {
         WORKSPACE_APP = "/tmp/teclado-app-${BUILD_NUMBER}"
         DEPLOY_DIR = '/var/www/html'
 
-        // Configuración de build
-        BUILD_TIMESTAMP = sh(script: 'date "+%Y-%m-%d_%H:%M:%S"', returnStdout: true).trim()
-        BUILD_DATE = sh(script: 'date "+%Y-%m-%d %H:%M:%S"', returnStdout: true).trim()
+        // Configuración de build en hora de Colombia (UTC-5)
+        BUILD_TIMESTAMP = sh(script: 'TZ=America/Bogota date "+%Y-%m-%d_%H:%M:%S"', returnStdout: true).trim()
+        BUILD_DATE = sh(script: 'TZ=America/Bogota date "+%Y-%m-%d %H:%M:%S"', returnStdout: true).trim()
         APP_VERSION = "v1.0.${BUILD_NUMBER}"
     }
 
@@ -35,7 +35,7 @@ pipeline {
                 // Checkout REAL del repositorio Teclado
                 checkout([$class: 'GitSCM',
                     branches: [[name: '*/main']],
-                    userRemoteConfigs: [[url: 'https://github.com/Lrojas898/Teclado.git']],
+                    userRemoteConfigs: [[url: 'https://github.com/Lrojas898/Teclado.git  ']],
                     extensions: [[$class: 'CleanBeforeCheckout']]
                 ])
 
@@ -298,7 +298,7 @@ EOF
                         # Instalar Node.js si no está disponible (requerido para JavaScript analyzer)
                         if ! command -v node >/dev/null 2>&1; then
                             echo "Instalando Node.js para JavaScript analyzer..."
-                            curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
+                            curl -fsSL https://deb.nodesource.com/setup_20.x   | bash -
                             apt-get install -y -qq nodejs
                             echo "Node.js version: $(node --version)"
                             echo "NPM version: $(npm --version)"
@@ -309,7 +309,7 @@ EOF
                         # Descargar SonarQube Scanner si no existe
                         if [ ! -d "sonar-scanner-5.0.1.3006-linux" ]; then
                             echo "Descargando SonarQube Scanner..."
-                            wget -q https://binaries.sonarsource.com/Distribution/sonar-scanner-cli/sonar-scanner-cli-5.0.1.3006-linux.zip
+                            wget -q https://binaries.sonarsource.com/Distribution/sonar-scanner-cli/sonar-scanner-cli-5.0.1.3006-linux.zip  
                             unzip -q sonar-scanner-cli-5.0.1.3006-linux.zip
                         fi
 
