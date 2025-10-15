@@ -477,3 +477,4 @@ ssh adminuser@68.211.125.160 "sudo tail /var/log/nginx/error.log"
 5. **Monitoring**: Métricas de uso y performance
 
 Esta aplicación demuestra la implementación exitosa de una aplicación web moderna integrada con un pipeline CI/CD completo, siguiendo las mejores prácticas de desarrollo, calidad y operaciones.
+<!-- Webhook test: Generic Webhook Trigger configured -->
