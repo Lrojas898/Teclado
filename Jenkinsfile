@@ -338,17 +338,7 @@ EOF
 
                         echo "Ejecutando análisis de calidad con Node.js..."
                         echo "Node path: $(which node)"
-                        # Ejecutar con timeout de 10 minutos
-                        timeout 600 sonar-scanner || {
-                            EXIT_CODE=$?
-                            if [ $EXIT_CODE -eq 124 ]; then
-                                echo "WARNING: SonarQube analysis timeout después de 10 minutos"
-                                echo "Continuando sin análisis completo de JavaScript..."
-                            else
-                                echo "ERROR: SonarQube analysis falló con código: $EXIT_CODE"
-                                exit $EXIT_CODE
-                            fi
-                        }
+                        sonar-scanner
 
                         # Obtener resultados del Quality Gate REAL
                         echo "Obteniendo resultados del Quality Gate..."
